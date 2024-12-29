@@ -10,110 +10,96 @@ import matplotlib.dates as mdates
 df = pd.read_csv('fcc-forum-pageviews.csv',date_parser = True, )
 df.set_index('date', inplace=True)
 # Clean data
-df = df.drop(df[df['value'] < df['value'].quantile(0.025)].index)
-df = df.drop(df[df['value'] > df['value'].quantile(0.975)].index)
+df = df[(df['value'] > df['value'].quantile(0.025)) & (df['value'] < df['value'].quantile(0.975))]
 
 
 def draw_line_plot():
     # Ensure the index is in datetime format
     df.index = pd.to_datetime(df.index)
 
-    # Create a figure and axis
+    # Create the plot
     fig, ax = plt.subplots(figsize=(20, 6))
-
-    # Plot 'value' over 'date'
     ax.plot(df.index, df['value'], color='red')
 
-    # Label the axes
+    # Set title and labels
+    ax.set_title('Daily freeCodeCamp Forum Page Views 5/2016-12/2019')  # Fix title
     ax.set_xlabel('Date')
     ax.set_ylabel('Page Views')
-    ax.set_title('Daily Forum Page Views')
 
-    # Set the x-axis locator to show every month
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))  # 6-month interval
+    # Format x-axis
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
 
-    # Set the lower limit of the x-axis to the desired start date
-    start_date = pd.to_datetime('2016-05')  # Set your desired start date here
-    ax.set_xlim(left=start_date)  # Set the lower limit to the start_date
-
-    # Set the date format for the x-axis
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))  # Custom date format (Year-Month)
-
-    # Explicitly set the x-axis as a date axis
-    ax.xaxis_date()
-
-    # Save image and return the figure (don't change this part)
+    # Save and return figure
     fig.savefig('line_plot.png')
     return fig
 
 
 def draw_bar_plot():
-    # Create copy of the data to avoid modifications to original
+    # Create a copy of the data
     df_bar = df.copy()
-    
-    # Add month and year columns
+
+    # Add year and month columns
     df_bar['year'] = df_bar.index.year
-    df_bar['month'] = df_bar.index.strftime('%B')  # Full month name
-    
-    # Calculate the mean page views for each year-month combination
+    df_bar['month'] = df_bar.index.month
+
+    # Group by year and month to calculate the mean
     df_bar = df_bar.groupby(['year', 'month'])['value'].mean().reset_index()
-    
-    # Ensure months are in correct order
-    month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
-                  'July', 'August', 'September', 'October', 'November', 'December']
+
+    # Map month numbers to their names
+    month_order = ['January', 'February', 'March', 'April', 'May', 'June',
+                   'July', 'August', 'September', 'October', 'November', 'December']
+    df_bar['month'] = df_bar['month'].apply(lambda x: month_order[x-1])
+
+    # Ensure months are ordered correctly
     df_bar['month'] = pd.Categorical(df_bar['month'], categories=month_order, ordered=True)
-    
-    # Sort by year and month
-    df_bar = df_bar.sort_values(['year', 'month'])
-    
-    # Create the plot
-    fig, ax = plt.subplots(figsize=(7, 6))
-    
-    # Create the bar plot
-    sns.barplot(data=df_bar, 
-                x='year', 
-                y='value', 
-                hue='month',
-                palette='Set2',
-                ax=ax)
-    
-    # Customize the plot
+    df_bar = df_bar[df_bar['value'].notna()]
+
+    # Plot the data
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=df_bar, x='year', y='value', hue='month', palette='Set2', ax=ax)
+
+    # Set labels
     ax.set_xlabel('Years')
     ax.set_ylabel('Average Page Views')
-    
-    # Rotate x-axis labels if needed
-    plt.xticks(rotation=0)
-    
-    # Adjust legend position and style
-    plt.legend(title='Months',
-              bbox_to_anchor=(1.05, 1),
-              loc='upper left',
-              borderaxespad=0.)
-    
-    # Adjust layout to prevent label cutoff
-    plt.tight_layout()
-    
-    # Save the plot
-    fig.savefig('bar_plot.png',
-                dpi=300,
-                bbox_inches='tight')
-    
-    return fig
 
+    # Adjust legend
+    plt.legend(title='Months', bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+
+    # Adjust layout to prevent cutoff
+    plt.tight_layout()
+
+    # Save and return the figure
+    fig.savefig('bar_plot.png')
+    return fig
     
 def draw_box_plot():
-    # Prepare data for box plots (this part is done!)
+    # Prepare data
     df_box = df.copy()
     df_box.reset_index(inplace=True)
-    df_box['year'] = [d.year for d in df_box.date]
-    df_box['month'] = [d.strftime('%b') for d in df_box.date]
+    df_box['year'] = df_box['date'].dt.year
+    df_box['month'] = df_box['date'].dt.strftime('%b')
 
-    # Draw box plots (using Seaborn)
+    # Draw box plots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 6))
 
+    # Year-wise Box Plot
+    sns.boxplot(data=df_box, x="year", y="value", ax=ax1, palette='husl')
+    ax1.set_title("Year-wise Box Plot (Trend)")
+    ax1.set_xlabel("Year")
+    ax1.set_ylabel("Page Views")  # Fix the ylabel
 
+    # Month-wise Box Plot
+    month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    sns.boxplot(data=df_box, x="month", y="value", order=month_order, ax=ax2, palette='husl')
+    ax2.set_title("Month-wise Box Plot (Seasonality)")
+    ax2.set_xlabel("Month")
+    ax2.set_ylabel("Page Views")  # Fix the ylabel
 
+    # Adjust layout
+    plt.tight_layout()
 
-
-    # Save image and return fig (don't change this part)
+    # Save and return figure
     fig.savefig('box_plot.png')
     return fig
